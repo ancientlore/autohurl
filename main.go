@@ -43,7 +43,7 @@ var (
 	timeout      time.Duration = 10 * time.Second
 	method       string        = "GET"
 	loop         int           = 1
-	filesPat     string
+	filesPat     string        = "*.*"
 	cpuProfile   string
 	memProfile   string
 	cpus         int
@@ -57,7 +57,7 @@ var (
 	version      bool
 	help         bool
 	headers      []hdr
-	sleepTime    time.Duration = time.Minute
+	sleepTime    time.Duration = time.Second
 	maxFileSize  int           = 1024 * 1024
 )
 
@@ -278,14 +278,31 @@ func main() {
 	}()
 
 	// Build pipeline
-	var patList []string
-	if filesPat != "" {
-		patList = strings.Split(filesPat, ",")
+	/*
+		var patList []string
+		if filesPat != "" {
+			patList = strings.Split(filesPat, ",")
+		}
+	*/
+	ch1 := readDir(ctx, ".", filesPat, sleepTime)
+
+	done := ctx.Done()
+	for {
+		select {
+		case i, ok := <-ch1:
+			if !ok {
+				break
+			}
+			log.Print(i.Name())
+		case <-done:
+			break
+		}
 	}
-	ch1 := loopCount(ctx, loop)
-	ch2 := loopUrls(ctx, method, flag.Args(), ch1)
-	ch3 := loopFiles(ctx, patList, ch2)
-	doHttp(ctx, conns, ch3)
+	/*
+		ch2 := loopUrls(ctx, method, flag.Args(), ch1)
+		ch3 := loopFiles(ctx, patList, ch2)
+		doHttp(ctx, conns, ch3)
+	*/
 
 	// write memory profile if configured
 	if memProfile != "" {
