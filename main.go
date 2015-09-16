@@ -173,11 +173,6 @@ func main() {
 		return
 	}
 
-	if flag.NArg() < 1 {
-		fmt.Fprintf(os.Stderr, "Please provide a URL to fetch.\n")
-		return
-	}
-
 	err := parseHeaders()
 	if err != nil {
 		log.Fatal(err)
@@ -284,7 +279,7 @@ func main() {
 			patList = strings.Split(filesPat, ",")
 		}
 	*/
-	ch1 := readDir(ctx, ".", filesPat, sleepTime)
+	ch1 := readDir(ctx, ".", filesPat, sleepTime, maxFileSize)
 
 	done := ctx.Done()
 	for {
