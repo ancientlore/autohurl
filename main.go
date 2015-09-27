@@ -42,13 +42,12 @@ var (
 	conns        int           = 10
 	timeout      time.Duration = 10 * time.Second
 	method       string        = "GET"
-	loop         int           = 1
 	filesPat     string        = "*.*"
+	batchSize    int           = 32 * 1024
 	cpuProfile   string
 	memProfile   string
 	cpus         int
 	workingDir   string
-	discard      bool
 	noCompress   bool
 	noKeepAlive  bool
 	useRequestId bool
@@ -78,6 +77,7 @@ func init() {
 	// processing
 	flag.DurationVar(&sleepTime, "sleep", sleepTime, "Interval to wait when no files are found.")
 	flag.IntVar(&maxFileSize, "maxsize", maxFileSize, "Maximum file size to post.")
+	flag.IntVar(&batchSize, "batchsize", batchSize, "Readdir batch size.")
 
 	// headers
 	flag.StringVar(&headerDelim, "hdrdelim", headerDelim, "Delimiter for HTTP headers specified with -header.")
@@ -214,11 +214,15 @@ func main() {
 	kubismus.Define("ResponseTime", kubismus.AVERAGE, "Average Time (s)")
 	kubismus.Note("Concurrent Connections", strconv.Itoa(conns))
 	kubismus.Note("HTTP Method", method)
-	kubismus.Note("Timeout", timeout.String())
+	kubismus.Note("HTTP Timeout", timeout.String())
 	kubismus.Note("Processors", fmt.Sprintf("%d of %d", runtime.GOMAXPROCS(0), runtime.NumCPU()))
 	kubismus.Note("Data files", strings.Join(strings.Split(filesPat, ","), "\n"))
 	kubismus.Note("URLs", strings.Join(flag.Args(), "\n"))
-	kubismus.Note("Discard files", strconv.FormatBool(discard))
+	kubismus.Note("Keep-alive", strconv.FormatBool(!noKeepAlive))
+	kubismus.Note("Compress", strconv.FormatBool(!noCompress))
+	kubismus.Note("Use Request ID", strconv.FormatBool(useRequestId))
+	kubismus.Note("Sleep interval", sleepTime.String())
+	kubismus.Note("Max file size", strconv.FormatInt(int64(maxFileSize), 10))
 	http.Handle("/", http.HandlerFunc(kubismus.ServeHTTP))
 	http.HandleFunc("/media/", ServeHTTP)
 
@@ -279,7 +283,7 @@ func main() {
 			patList = strings.Split(filesPat, ",")
 		}
 	*/
-	ch1 := readDir(ctx, ".", filesPat, sleepTime, maxFileSize)
+	ch1 := readDir(ctx, ".", filesPat, sleepTime, maxFileSize, batchSize)
 
 	done := ctx.Done()
 	for {

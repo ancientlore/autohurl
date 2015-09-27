@@ -6,14 +6,22 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 )
 
-func readDir(ctx context.Context, folder, filePattern string, sleep time.Duration, maxSize int) <-chan os.FileInfo {
+type FI []os.FileInfo
+
+func (fi FI) Len() int           { return len(fi) }
+func (fi FI) Swap(i, j int)      { fi[i], fi[j] = fi[j], fi[i] }
+func (fi FI) Less(i, j int) bool { return fi[i].Name() < fi[j].Name() }
+
+func readDir(ctx context.Context, folder, filePattern string, sleep time.Duration, maxSize, dirBatchSize int) <-chan os.FileInfo {
 	done := ctx.Done()
 	out := make(chan os.FileInfo)
 	looper := func() {
 		defer close(out)
+		var lastInfo = make([]os.FileInfo, 0)
 		for {
 			var wait time.Duration = 0
 			fil, err := os.Open(folder)
@@ -21,7 +29,7 @@ func readDir(ctx context.Context, folder, filePattern string, sleep time.Duratio
 				log.Print("Unable to open folder: ", folder, " ", err)
 				return
 			}
-			info, err := fil.Readdir(0)
+			info, err := fil.Readdir(dirBatchSize)
 			fil.Close()
 			if err == io.EOF {
 				if info == nil || len(info) == 0 {
@@ -32,19 +40,30 @@ func readDir(ctx context.Context, folder, filePattern string, sleep time.Duratio
 				wait = 10 * time.Second
 			}
 
+			wait = sleep
 			for _, inf := range info {
 				if !inf.IsDir() {
+					// match file pattern
 					if matched, _ := filepath.Match(filePattern, inf.Name()); matched && inf.Size() < int64(maxSize) {
-						select {
-						case out <- inf:
-						case <-done:
-							return
+						// check if we saw the file last time
+						loc := sort.Search(len(lastInfo), func(i int) bool {
+							return lastInfo[i].Name() >= inf.Name()
+						})
+						if loc >= len(lastInfo) || (loc < len(lastInfo) && lastInfo[loc].Name() != inf.Name()) {
+							// send along the file
+							select {
+							case out <- inf:
+								wait = 0
+							case <-done:
+								return
+							}
 						}
 					}
 				}
 
 			}
-
+			lastInfo = info
+			sort.Sort(FI(lastInfo))
 			if wait > 0 {
 				c := time.After(wait)
 				select {
