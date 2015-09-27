@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"github.com/ancientlore/flagcfg"
@@ -14,74 +13,49 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
-	"strconv"
-	"strings"
 	"time"
 )
 
 // github.com/ancientlore/binder is used to package the web files into the executable.
 //go:generate binder -package main -o webcontent.go media/*.png
 
-type hdrMode int
-
-const (
-	HdrSet hdrMode = iota
-	HdrAdd
-)
-
-type hdr struct {
-	Key   string
-	Value string
-	Mode  hdrMode
-}
-
 var (
-	client       *http.Client
-	transport    *http.Transport
-	addr         string        = ":8080"
-	conns        int           = 10
-	timeout      time.Duration = 10 * time.Second
-	method       string        = "GET"
-	filesPat     string        = "*.*"
-	batchSize    int           = 32 * 1024
-	cpuProfile   string
-	memProfile   string
-	cpus         int
-	workingDir   string
-	noCompress   bool
-	noKeepAlive  bool
-	useRequestId bool
-	headerDelim  string = "|"
-	headerText   string
-	version      bool
-	help         bool
-	headers      []hdr
-	sleepTime    time.Duration = time.Second
-	maxFileSize  int           = 1024 * 1024
+	addr       string = ":8080"
+	cpuProfile string
+	memProfile string
+	cpus       int
+	workingDir string
+	version    bool
+	help       bool
+
+	defaultCfg DefaultCfg
 )
 
 func init() {
+
+	// Set initial settings
+	defaultCfg.Init()
 
 	// http service/status address
 	flag.StringVar(&addr, "addr", addr, "HTTP service address for monitoring.")
 
 	// http post settings
-	flag.IntVar(&conns, "conns", conns, "Number of concurrent HTTP connections.")
-	flag.DurationVar(&timeout, "timeout", timeout, "HTTP timeout.")
-	flag.StringVar(&filesPat, "files", filesPat, "Pattern of files to post, like *.xml.")
-	flag.StringVar(&method, "method", method, "HTTP method.")
-	flag.BoolVar(&useRequestId, "requestid", useRequestId, "Send X-RequestID header.")
-	flag.BoolVar(&noCompress, "nocompress", noCompress, "Disable HTTP compression.")
-	flag.BoolVar(&noKeepAlive, "nokeepalive", noKeepAlive, "Disable HTTP keep-alives.")
+	flag.IntVar(&defaultCfg.Conns, "conns", defaultCfg.Conns, "Number of concurrent HTTP connections.")
+	flag.DurationVar(&defaultCfg.Timeout, "timeout", defaultCfg.Timeout, "HTTP timeout.")
+	flag.StringVar(&defaultCfg.FilesPat, "files", defaultCfg.FilesPat, "Pattern of files to post, like *.xml.")
+	flag.StringVar(&defaultCfg.Method, "method", defaultCfg.Method, "HTTP method.")
+	flag.StringVar(&defaultCfg.UseRequestId, "requestid", defaultCfg.UseRequestId, "Name of header to send a random GUID.")
+	flag.BoolVar(&defaultCfg.NoCompress, "nocompress", defaultCfg.NoCompress, "Disable HTTP compression.")
+	flag.BoolVar(&defaultCfg.NoKeepAlive, "nokeepalive", defaultCfg.NoKeepAlive, "Disable HTTP keep-alives.")
 
 	// processing
-	flag.DurationVar(&sleepTime, "sleep", sleepTime, "Interval to wait when no files are found.")
-	flag.IntVar(&maxFileSize, "maxsize", maxFileSize, "Maximum file size to post.")
-	flag.IntVar(&batchSize, "batchsize", batchSize, "Readdir batch size.")
+	flag.DurationVar(&defaultCfg.SleepTime, "sleep", defaultCfg.SleepTime, "Interval to wait when no files are found.")
+	flag.IntVar(&defaultCfg.MaxFileSize, "maxsize", defaultCfg.MaxFileSize, "Maximum file size to post.")
+	flag.IntVar(&defaultCfg.BatchSize, "batchsize", defaultCfg.BatchSize, "Readdir batch size.")
 
 	// headers
-	flag.StringVar(&headerDelim, "hdrdelim", headerDelim, "Delimiter for HTTP headers specified with -header.")
-	flag.StringVar(&headerText, "headers", headerText, "HTTP headers, delimited by -hdrdelim.")
+	flag.StringVar(&defaultCfg.HeaderDelim, "hdrdelim", defaultCfg.HeaderDelim, "Delimiter for HTTP headers specified with -header.")
+	flag.StringVar(&defaultCfg.HeaderText, "headers", defaultCfg.HeaderText, "HTTP headers, delimited by -hdrdelim.")
 
 	// profiling
 	flag.StringVar(&cpuProfile, "cpuprofile", cpuProfile, "Write CPU profile to given file.")
@@ -126,31 +100,6 @@ func showVersion() {
 	fmt.Printf("autohURL version %s\n", AUTOHURL_VERSION)
 }
 
-func parseHeaders() error {
-	headers = make([]hdr, 0)
-	headerText = strings.TrimSpace(headerText)
-	if headerText != "" {
-		arr := strings.Split(headerText, headerDelim)
-		found := make(map[string]bool)
-		for _, h := range arr {
-			harr := strings.SplitN(h, ":", 2)
-			if len(harr) != 2 {
-				return errors.New("Unable to parse header: " + h)
-			}
-			newHdr := hdr{Key: strings.TrimSpace(harr[0]), Value: strings.TrimSpace(harr[1])}
-			_, ok := found[newHdr.Key]
-			if !ok {
-				found[newHdr.Key] = true
-				newHdr.Mode = HdrSet
-			} else {
-				newHdr.Mode = HdrAdd
-			}
-			headers = append(headers, newHdr)
-		}
-	}
-	return nil
-}
-
 func main() {
 	// Parse flags from command-line
 	flag.Parse()
@@ -173,7 +122,9 @@ func main() {
 		return
 	}
 
-	err := parseHeaders()
+	// parse default headers - make sure they work
+	var err error
+	err = defaultCfg.ParseHeaders()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -196,10 +147,6 @@ func main() {
 		}()
 	}
 
-	// create HTTP transport and client
-	transport = &http.Transport{DisableKeepAlives: noKeepAlive, MaxIdleConnsPerHost: conns, DisableCompression: noCompress, ResponseHeaderTimeout: timeout}
-	client = &http.Client{Transport: transport, Timeout: timeout}
-
 	// setup Kubismus
 	kubismus.Setup("autohURL", "/media/logo36.png")
 	kubismus.Define("Sent", kubismus.COUNT, "HTTP Posts")
@@ -212,17 +159,7 @@ func main() {
 	kubismus.Define("Received500", kubismus.COUNT, "5xx Responses")
 	kubismus.Define("Error", kubismus.COUNT, "Communication Errors")
 	kubismus.Define("ResponseTime", kubismus.AVERAGE, "Average Time (s)")
-	kubismus.Note("Concurrent Connections", strconv.Itoa(conns))
-	kubismus.Note("HTTP Method", method)
-	kubismus.Note("HTTP Timeout", timeout.String())
 	kubismus.Note("Processors", fmt.Sprintf("%d of %d", runtime.GOMAXPROCS(0), runtime.NumCPU()))
-	kubismus.Note("Data files", strings.Join(strings.Split(filesPat, ","), "\n"))
-	kubismus.Note("URLs", strings.Join(flag.Args(), "\n"))
-	kubismus.Note("Keep-alive", strconv.FormatBool(!noKeepAlive))
-	kubismus.Note("Compress", strconv.FormatBool(!noCompress))
-	kubismus.Note("Use Request ID", strconv.FormatBool(useRequestId))
-	kubismus.Note("Sleep interval", sleepTime.String())
-	kubismus.Note("Max file size", strconv.FormatInt(int64(maxFileSize), 10))
 	http.Handle("/", http.HandlerFunc(kubismus.ServeHTTP))
 	http.HandleFunc("/media/", ServeHTTP)
 
@@ -237,6 +174,8 @@ func main() {
 	if err == nil {
 		kubismus.Note("Working Directory", wd)
 	}
+
+	// read folders
 
 	// setup the thread context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -283,7 +222,7 @@ func main() {
 			patList = strings.Split(filesPat, ",")
 		}
 	*/
-	ch1 := readDir(ctx, ".", filesPat, sleepTime, maxFileSize, batchSize)
+	ch1 := readDir(ctx, ".", defaultCfg.FilesPat, defaultCfg.SleepTime, defaultCfg.MaxFileSize, defaultCfg.BatchSize)
 
 	done := ctx.Done()
 	for {

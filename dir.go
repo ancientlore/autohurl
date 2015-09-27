@@ -65,6 +65,7 @@ func readDir(ctx context.Context, folder, filePattern string, sleep time.Duratio
 			lastInfo = info
 			sort.Sort(FI(lastInfo))
 			if wait > 0 {
+				log.Print("Waiting ", wait.String())
 				c := time.After(wait)
 				select {
 				case <-done:
