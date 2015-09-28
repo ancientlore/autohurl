@@ -11,8 +11,10 @@ import (
 	"time"
 )
 
+// duration exists for TOML to handle durations
 type duration time.Duration
 
+// Unmarshals a duration from a string
 func (d *duration) UnmarshalText(text []byte) error {
 	dt, err := time.ParseDuration(string(text))
 	if err == nil {
@@ -21,10 +23,12 @@ func (d *duration) UnmarshalText(text []byte) error {
 	return err
 }
 
+// Marshals a duration as a string
 func (d duration) MarshalText() (text []byte, err error) {
 	return []byte(time.Duration(d).String()), nil
 }
 
+// Prints a duration as a string
 func (d duration) String() string {
 	return time.Duration(d).String()
 }
@@ -77,6 +81,7 @@ type FolderCfg struct {
 	transport    *http.Transport `toml:"-"`            // http transport for this folder
 }
 
+// Prints config in TOML
 func (c *FolderCfg) String() string {
 	var b bytes.Buffer
 	enc := toml.NewEncoder(&b)
@@ -176,10 +181,12 @@ func parseHeaders(headerText, headerDelim string) ([]hdr, error) {
 	return headers, nil
 }
 
+// conf is the non-default data present in the config file (the folder data only)
 type conf struct {
 	Folders map[string]*FolderCfg `toml:"folders"`
 }
 
+// readConfig reads the folder data from the config file
 func readConfig(fn string) (map[string]*FolderCfg, error) {
 	data, err := ioutil.ReadFile(fn)
 	if err != nil {
