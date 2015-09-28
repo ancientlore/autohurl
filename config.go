@@ -1,28 +1,50 @@
 package main
 
 import (
+	"bytes"
 	"errors"
-	"fmt"
+	"github.com/BurntSushi/toml"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 )
 
+type duration time.Duration
+
+func (d *duration) UnmarshalText(text []byte) error {
+	dt, err := time.ParseDuration(string(text))
+	if err == nil {
+		*d = duration(dt)
+	}
+	return err
+}
+
+func (d duration) MarshalText() (text []byte, err error) {
+	return []byte(time.Duration(d).String()), nil
+}
+
+func (d duration) String() string {
+	return time.Duration(d).String()
+}
+
 // DefaultCfg are configuration items that can be defaulted
 type DefaultCfg struct {
-	SleepTime    time.Duration `toml:"sleep"`       // Time to wait when no files are found
-	Timeout      time.Duration `toml:"timeout"`     // HTTP timeout
-	FilesPat     string        `toml:"files"`       // Pattern of files to look for
-	Conns        int           `toml:"conns"`       // Number of concurrent HTTP connections
-	Method       string        `toml:"method"`      // HTTP method (POST or PUT or PATCH, generally)
-	MaxFileSize  int           `toml:"maxsize"`     // Maximum file size - larger files are moved or ignored
-	NoCompress   bool          `toml:"nocompress"`  // Disable HTTP compression
-	NoKeepAlive  bool          `toml:"nokeepalive"` // Disable HTTP keep-alive (not recommended)
-	UseRequestId string        `toml:"requestid"`   // Enable X-RequestID header
-	BatchSize    int           `toml:"batchsize"`   // Readdir batch size
-	HeaderDelim  string        `toml:"hdrdelim"`    // Header delimiter
-	HeaderText   string        `toml:"headers"`     // Text of headers
-	headers      []hdr         `toml:"-"`           // Parsed headers
+	SleepTime    duration `toml:"sleep"`       // Time to wait when no files are found
+	Timeout      duration `toml:"timeout"`     // HTTP timeout
+	FilesPat     string   `toml:"files"`       // Pattern of files to look for
+	Conns        int      `toml:"conns"`       // Number of concurrent HTTP connections
+	Method       string   `toml:"method"`      // HTTP method (POST or PUT or PATCH, generally)
+	MaxFileSize  int      `toml:"maxsize"`     // Maximum file size - larger files are moved or ignored
+	NoCompress   bool     `toml:"nocompress"`  // Disable HTTP compression
+	NoKeepAlive  bool     `toml:"nokeepalive"` // Disable HTTP keep-alive (not recommended)
+	UseRequestId string   `toml:"requestid"`   // Enable X-RequestID header
+	BatchSize    int      `toml:"batchsize"`   // Readdir batch size
+	HeaderDelim  string   `toml:"hdrdelim"`    // Header delimiter
+	HeaderText   string   `toml:"headers"`     // Text of headers
+	FileInfo     bool     `toml:"fileinfo"`    // Whether to pass file info
+	Headers      []hdr    `toml:"-"`           // Parsed headers
 }
 
 // Init sets the default values for DefaultCfg
@@ -32,15 +54,15 @@ func (c *DefaultCfg) Init() {
 	c.Method = "POST"
 	c.Conns = 2
 	c.FilesPat = "*.*"
-	c.Timeout = 10 * time.Second
-	c.SleepTime = time.Second
+	c.Timeout = duration(10 * time.Second)
+	c.SleepTime = duration(time.Second)
 	c.HeaderDelim = "|"
 }
 
 // ParseHeaders parses the header text
 func (c *DefaultCfg) ParseHeaders() error {
 	var err error
-	c.headers, err = parseHeaders(c.HeaderText, c.HeaderDelim)
+	c.Headers, err = parseHeaders(c.HeaderText, c.HeaderDelim)
 	return err
 }
 
@@ -56,30 +78,21 @@ type FolderCfg struct {
 }
 
 func (c *FolderCfg) String() string {
-	return fmt.Sprintf(`folder: %s
-files: %s
-moveto: %s
-movefailedto: %s
-url: %s
-timeout: %s
-conns: %d
-method: %s
-compress: %b
-keepalive: %b
-requestid: %s
-sleep: %s
-maxfilesize: %d bytes
-batchsize: %d
-headers:
-`, c.FilesPat, c.MoveTo, c.MoveFailedTo, c.URL, c.Timeout.String(), c.Conns, c.Method, !c.NoCompress, !c.NoKeepAlive, c.UseRequestId, c.SleepTime.String(), c.MaxFileSize, c.BatchSize)
+	var b bytes.Buffer
+	enc := toml.NewEncoder(&b)
+	err := enc.Encode(c)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(b.Bytes())
 }
 
 // SetDefaults fills in any unset defaults from a default config object
 func (c *FolderCfg) SetDefaults(from *DefaultCfg) {
-	if c.SleepTime == 0 {
+	if c.SleepTime == duration(0) {
 		c.SleepTime = from.SleepTime
 	}
-	if c.Timeout == 0 {
+	if c.Timeout == duration(0) {
 		c.Timeout = from.Timeout
 	}
 	if c.FilesPat == "" {
@@ -111,6 +124,9 @@ func (c *FolderCfg) SetDefaults(from *DefaultCfg) {
 	}
 	if c.HeaderText == "" {
 		c.HeaderText = from.HeaderText
+	}
+	if c.FileInfo == false {
+		c.FileInfo = from.FileInfo
 	}
 }
 
@@ -160,6 +176,18 @@ func parseHeaders(headerText, headerDelim string) ([]hdr, error) {
 	return headers, nil
 }
 
-func readConfig(fn string) ([]FolderCfg, error) {
-	return nil, nil
+type conf struct {
+	Folders map[string]*FolderCfg `toml:"folders"`
+}
+
+func readConfig(fn string) (map[string]*FolderCfg, error) {
+	data, err := ioutil.ReadFile(fn)
+	if err != nil {
+		return nil, err
+	}
+	var c conf
+	if _, err := toml.Decode(string(data), &c); err != nil {
+		return nil, err
+	}
+	return c.Folders, nil
 }

@@ -41,15 +41,16 @@ func init() {
 
 	// http post settings
 	flag.IntVar(&defaultCfg.Conns, "conns", defaultCfg.Conns, "Number of concurrent HTTP connections.")
-	flag.DurationVar(&defaultCfg.Timeout, "timeout", defaultCfg.Timeout, "HTTP timeout.")
+	flag.DurationVar((*time.Duration)(&defaultCfg.Timeout), "timeout", time.Duration(defaultCfg.Timeout), "HTTP timeout.")
 	flag.StringVar(&defaultCfg.FilesPat, "files", defaultCfg.FilesPat, "Pattern of files to post, like *.xml.")
 	flag.StringVar(&defaultCfg.Method, "method", defaultCfg.Method, "HTTP method.")
 	flag.StringVar(&defaultCfg.UseRequestId, "requestid", defaultCfg.UseRequestId, "Name of header to send a random GUID.")
 	flag.BoolVar(&defaultCfg.NoCompress, "nocompress", defaultCfg.NoCompress, "Disable HTTP compression.")
 	flag.BoolVar(&defaultCfg.NoKeepAlive, "nokeepalive", defaultCfg.NoKeepAlive, "Disable HTTP keep-alives.")
+	flag.BoolVar(&defaultCfg.FileInfo, "fileinfo", defaultCfg.FileInfo, "Whether to send file information headers.")
 
 	// processing
-	flag.DurationVar(&defaultCfg.SleepTime, "sleep", defaultCfg.SleepTime, "Interval to wait when no files are found.")
+	flag.DurationVar((*time.Duration)(&defaultCfg.SleepTime), "sleep", time.Duration(defaultCfg.SleepTime), "Interval to wait when no files are found.")
 	flag.IntVar(&defaultCfg.MaxFileSize, "maxsize", defaultCfg.MaxFileSize, "Maximum file size to post.")
 	flag.IntVar(&defaultCfg.BatchSize, "batchsize", defaultCfg.BatchSize, "Readdir batch size.")
 
@@ -81,10 +82,10 @@ func showHelp() {
 A tool to continuously post files found in a folder.
 
 Usage:
-  hurl [options] url1 [url2 ... urlN]
+  autohurl [options] url1 [url2 ... urlN]
 
 Example:
-  hurl -method POST -files "*.xml" -conns 10 http://localhost/svc/foo http://localhost/svc/bar
+  autohurl -method POST -files "*.xml" -conns 10
 
 Options:`)
 	flag.PrintDefaults()
@@ -149,16 +150,6 @@ func main() {
 
 	// setup Kubismus
 	kubismus.Setup("autohURL", "/media/logo36.png")
-	kubismus.Define("Sent", kubismus.COUNT, "HTTP Posts")
-	kubismus.Define("Sent", kubismus.SUM, "Bytes Sent")
-	kubismus.Define("Received", kubismus.SUM, "Bytes Received")
-	kubismus.Define("Received100", kubismus.COUNT, "1xx Responses")
-	kubismus.Define("Received200", kubismus.COUNT, "2xx Responses")
-	kubismus.Define("Received300", kubismus.COUNT, "3xx Responses")
-	kubismus.Define("Received400", kubismus.COUNT, "4xx Responses")
-	kubismus.Define("Received500", kubismus.COUNT, "5xx Responses")
-	kubismus.Define("Error", kubismus.COUNT, "Communication Errors")
-	kubismus.Define("ResponseTime", kubismus.AVERAGE, "Average Time (s)")
 	kubismus.Note("Processors", fmt.Sprintf("%d of %d", runtime.GOMAXPROCS(0), runtime.NumCPU()))
 	http.Handle("/", http.HandlerFunc(kubismus.ServeHTTP))
 	http.HandleFunc("/media/", ServeHTTP)
@@ -176,6 +167,27 @@ func main() {
 	}
 
 	// read folders
+	var cfg map[string]*FolderCfg
+	cfg, err = readConfig(flagcfg.Filename())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(cfg) == 0 {
+		log.Fatal("No folders configured to watch")
+	}
+	// set up default settings
+	for i, _ := range cfg {
+		cfg[i].SetDefaults(&defaultCfg)
+		err = cfg[i].ParseHeaders()
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("[folders.%s]\n%s\n", i, cfg[i].String())
+		kubismus.Note("folders."+i, cfg[i].String())
+		kubismus.Define(i+"_Sent", kubismus.COUNT, i+": HTTP Posts")
+		kubismus.Define(i+"_Sent", kubismus.SUM, i+": Bytes Sent")
+		kubismus.Define(i+"_ResponseTime", kubismus.AVERAGE, i+": Average Time (s)")
+	}
 
 	// setup the thread context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -216,13 +228,8 @@ func main() {
 	}()
 
 	// Build pipeline
-	/*
-		var patList []string
-		if filesPat != "" {
-			patList = strings.Split(filesPat, ",")
-		}
-	*/
-	ch1 := readDir(ctx, ".", defaultCfg.FilesPat, defaultCfg.SleepTime, defaultCfg.MaxFileSize, defaultCfg.BatchSize)
+
+	ch1 := readDir(ctx, ".", defaultCfg.FilesPat, time.Duration(defaultCfg.SleepTime), defaultCfg.MaxFileSize, defaultCfg.BatchSize)
 
 	done := ctx.Done()
 	for {
@@ -237,8 +244,8 @@ func main() {
 		}
 	}
 	/*
-		ch2 := loopUrls(ctx, method, flag.Args(), ch1)
-		ch3 := loopFiles(ctx, patList, ch2)
+		ch2 := loop1(ctx, x, ch1)
+		ch3 := loop2(ctx, y, ch2)
 		doHttp(ctx, conns, ch3)
 	*/
 
