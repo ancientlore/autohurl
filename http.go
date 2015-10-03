@@ -20,6 +20,10 @@ import (
 func doHttp(ctx context.Context, name string, cfg *FolderCfg, ch <-chan os.FileInfo) {
 	var wg sync.WaitGroup
 
+	// create HTTP transport and client
+	cfg.transport = &http.Transport{DisableKeepAlives: cfg.NoKeepAlive, MaxIdleConnsPerHost: cfg.Conns, DisableCompression: cfg.NoCompress, ResponseHeaderTimeout: time.Duration(cfg.Timeout)}
+	cfg.client = &http.Client{Transport: cfg.transport, Timeout: time.Duration(cfg.Timeout)}
+
 	// create HTTP posting threads
 	wg.Add(cfg.Conns)
 	for i := 0; i < cfg.Conns; i++ {
@@ -33,10 +37,6 @@ func doHttp(ctx context.Context, name string, cfg *FolderCfg, ch <-chan os.FileI
 func posterThread(ctx context.Context, name string, cfg *FolderCfg, ch <-chan os.FileInfo, wg *sync.WaitGroup) {
 	done := ctx.Done()
 	defer wg.Done()
-
-	// create HTTP transport and client
-	cfg.transport = &http.Transport{DisableKeepAlives: cfg.NoKeepAlive, MaxIdleConnsPerHost: cfg.Conns, DisableCompression: cfg.NoCompress, ResponseHeaderTimeout: time.Duration(cfg.Timeout)}
-	cfg.client = &http.Client{Transport: cfg.transport, Timeout: time.Duration(cfg.Timeout)}
 
 	for {
 		select {
