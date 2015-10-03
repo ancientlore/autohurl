@@ -225,28 +225,8 @@ func main() {
 	// Build pipeline
 	for name, fldr := range cfg {
 		ch1 := readDir(ctx, name, fldr)
-
-		go func(name string, ch1 <-chan os.FileInfo) {
-			done := ctx.Done()
-			for {
-				select {
-				case i, ok := <-ch1:
-					if !ok {
-						break
-					}
-					log.Print(i.Name())
-				case <-done:
-					break
-				}
-			}
-		}(name, ch1)
+		go doHttp(ctx, name, fldr, ch1)
 	}
-
-	/*
-		ch2 := loop1(ctx, x, ch1)
-		ch3 := loop2(ctx, y, ch2)
-		doHttp(ctx, conns, ch3)
-	*/
 
 	// write memory profile if configured
 	if memProfile != "" {

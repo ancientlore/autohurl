@@ -135,10 +135,6 @@ func (c *FolderCfg) SetDefaults(from *DefaultCfg) {
 	}
 }
 
-// create HTTP transport and client
-// transport = &http.Transport{DisableKeepAlives: noKeepAlive, MaxIdleConnsPerHost: conns, DisableCompression: noCompress, ResponseHeaderTimeout: timeout}
-// client = &http.Client{Transport: transport, Timeout: timeout}
-
 // header mode
 type hdrMode int
 
