@@ -16,7 +16,7 @@ func (fi FI) Len() int           { return len(fi) }
 func (fi FI) Swap(i, j int)      { fi[i], fi[j] = fi[j], fi[i] }
 func (fi FI) Less(i, j int) bool { return fi[i].Name() < fi[j].Name() }
 
-func readDir(ctx context.Context, folder, filePattern string, sleep time.Duration, maxSize, dirBatchSize int) <-chan os.FileInfo {
+func readDir(ctx context.Context, name string, cfg *FolderCfg) <-chan os.FileInfo {
 	done := ctx.Done()
 	out := make(chan os.FileInfo)
 	looper := func() {
@@ -24,27 +24,27 @@ func readDir(ctx context.Context, folder, filePattern string, sleep time.Duratio
 		var lastInfo = make([]os.FileInfo, 0)
 		for {
 			var wait time.Duration = 0
-			fil, err := os.Open(folder)
+			fil, err := os.Open(cfg.Folder)
 			if err != nil {
-				log.Print("Unable to open folder: ", folder, " ", err)
+				log.Print(name, ": Unable to open folder: ", cfg.Folder, " ", err)
 				return
 			}
-			info, err := fil.Readdir(dirBatchSize)
+			info, err := fil.Readdir(cfg.BatchSize)
 			fil.Close()
 			if err == io.EOF {
 				if info == nil || len(info) == 0 {
-					wait = sleep
+					wait = time.Duration(cfg.SleepTime)
 				}
 			} else if err != nil {
-				log.Print("Error reading folder: ", folder, " ", err)
+				log.Print(name, ": Error reading folder: ", cfg.Folder, " ", err)
 				wait = 10 * time.Second
 			}
 
-			wait = sleep
+			wait = time.Duration(cfg.SleepTime)
 			for _, inf := range info {
 				if !inf.IsDir() {
 					// match file pattern
-					if matched, _ := filepath.Match(filePattern, inf.Name()); matched && inf.Size() < int64(maxSize) {
+					if matched, _ := filepath.Match(cfg.FilesPat, inf.Name()); matched {
 						// check if we saw the file last time
 						loc := sort.Search(len(lastInfo), func(i int) bool {
 							return lastInfo[i].Name() >= inf.Name()
@@ -65,7 +65,7 @@ func readDir(ctx context.Context, folder, filePattern string, sleep time.Duratio
 			lastInfo = info
 			sort.Sort(FI(lastInfo))
 			if wait > 0 {
-				log.Print("Waiting ", wait.String())
+				log.Print(name, ": Waiting ", wait.String())
 				c := time.After(wait)
 				select {
 				case <-done:

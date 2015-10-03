@@ -208,11 +208,6 @@ func main() {
 		}
 	}()
 
-	// spawn the status web site
-	go func() {
-		log.Fatal(http.ListenAndServe(addr, nil))
-	}()
-
 	// handle kill signals
 	go func() {
 		// Set up channel on which to send signal notifications.
@@ -228,21 +223,25 @@ func main() {
 	}()
 
 	// Build pipeline
+	for name, fldr := range cfg {
+		ch1 := readDir(ctx, name, fldr)
 
-	ch1 := readDir(ctx, ".", defaultCfg.FilesPat, time.Duration(defaultCfg.SleepTime), defaultCfg.MaxFileSize, defaultCfg.BatchSize)
-
-	done := ctx.Done()
-	for {
-		select {
-		case i, ok := <-ch1:
-			if !ok {
-				break
+		go func(name string, ch1 <-chan os.FileInfo) {
+			done := ctx.Done()
+			for {
+				select {
+				case i, ok := <-ch1:
+					if !ok {
+						break
+					}
+					log.Print(i.Name())
+				case <-done:
+					break
+				}
 			}
-			log.Print(i.Name())
-		case <-done:
-			break
-		}
+		}(name, ch1)
 	}
+
 	/*
 		ch2 := loop1(ctx, x, ch1)
 		ch3 := loop2(ctx, y, ch2)
@@ -251,13 +250,18 @@ func main() {
 
 	// write memory profile if configured
 	if memProfile != "" {
-		f, err := os.Create(memProfile)
-		if err != nil {
-			log.Print(err)
-		} else {
-			log.Print("Writing memory profile to ", memProfile)
-			pprof.WriteHeapProfile(f)
-			f.Close()
-		}
+		defer func() {
+			f, err := os.Create(memProfile)
+			if err != nil {
+				log.Print(err)
+			} else {
+				log.Print("Writing memory profile to ", memProfile)
+				pprof.WriteHeapProfile(f)
+				f.Close()
+			}
+		}()
 	}
+
+	// status web site
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
