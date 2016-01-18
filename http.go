@@ -66,7 +66,7 @@ func posterThread(ctx context.Context, name string, cfg *FolderCfg, ch <-chan os
 				}
 
 				if i.Filename != "" {
-					f, err = os.Open(i.Filename)
+					f, err = os.OpenFile(i.FileName, os.O_RDONLY|os.O_SYNC, 0666)
 					if err != nil {
 						log.Printf(name, ": Unable to open %s", i.Filename)
 						continue
