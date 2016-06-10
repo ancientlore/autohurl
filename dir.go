@@ -38,32 +38,31 @@ func readDir(ctx context.Context, name string, cfg *FolderCfg) <-chan os.FileInf
 			} else if err != nil {
 				log.Print(name, ": Error reading folder: ", cfg.Folder, " ", err)
 				wait = 10 * time.Second
-			}
-
-			wait = time.Duration(cfg.SleepTime)
-			for _, inf := range info {
-				if !inf.IsDir() {
-					// match file pattern
-					if matched, _ := filepath.Match(cfg.FilesPat, inf.Name()); matched {
-						// check if we saw the file last time
-						loc := sort.Search(len(lastInfo), func(i int) bool {
-							return lastInfo[i].Name() >= inf.Name()
-						})
-						if loc >= len(lastInfo) || (loc < len(lastInfo) && lastInfo[loc].Name() != inf.Name()) {
-							// send along the file
-							select {
-							case out <- inf:
-								wait = 0
-							case <-done:
-								return
+			} else {
+				wait = time.Duration(cfg.SleepTime)
+				for _, inf := range info {
+					if !inf.IsDir() {
+						// match file pattern
+						if matched, _ := filepath.Match(cfg.FilesPat, inf.Name()); matched {
+							// check if we saw the file last time
+							loc := sort.Search(len(lastInfo), func(i int) bool {
+								return lastInfo[i].Name() >= inf.Name()
+							})
+							if loc >= len(lastInfo) || (loc < len(lastInfo) && lastInfo[loc].Name() != inf.Name()) {
+								// send along the file
+								select {
+								case out <- inf:
+									wait = 0
+								case <-done:
+									return
+								}
 							}
 						}
 					}
 				}
-
+				lastInfo = info
+				sort.Sort(FI(lastInfo))
 			}
-			lastInfo = info
-			sort.Sort(FI(lastInfo))
 			if wait > 0 {
 				log.Print(name, ": Waiting ", wait.String())
 				c := time.After(wait)
