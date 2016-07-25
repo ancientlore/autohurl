@@ -67,6 +67,11 @@ func processFile(name string, cfg *FolderCfg, inf os.FileInfo) {
 		return
 	}
 
+	// Give very new files a change to finish up. Sort of hacky.
+	if inf.ModTime().After(time.Now().Add(-time.Second)) {
+		time.Sleep(time.Second)
+	}
+
 	fname := filepath.Join(cfg.Folder, inf.Name())
 
 	// skip large file, possibly moving it
@@ -123,7 +128,7 @@ func postFile(name string, cfg *FolderCfg, inf os.FileInfo) error {
 	fname := filepath.Join(cfg.Folder, inf.Name())
 
 	// open file
-	f, err = os.OpenFile(fname, os.O_RDONLY|os.O_SYNC, 0666)
+	f, err = os.Open(fname)
 	if err != nil {
 		log.Printf("%s: Unable to open %s", name, fname)
 		return err
@@ -152,6 +157,13 @@ func postFile(name string, cfg *FolderCfg, inf os.FileInfo) error {
 		if err == nil {
 			req.Header.Set(cfg.UseRequestId, guid.String())
 		}
+	}
+
+	// set file info headers
+	if cfg.FileInfo {
+		req.Header.Set("X-Autohurl-Name", inf.Name())
+		req.Header.Set("X-Autohurl-Size", fmt.Sprintf("%d", inf.Size()))
+		req.Header.Set("X-Autohurl-Modtime", inf.ModTime().Format(time.RFC3339Nano))
 	}
 
 	// set headers

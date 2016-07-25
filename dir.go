@@ -41,6 +41,7 @@ func readDir(ctx context.Context, name string, cfg *FolderCfg) <-chan os.FileInf
 			} else {
 				wait = time.Duration(cfg.SleepTime)
 				for _, inf := range info {
+					// Don't send directories
 					if !inf.IsDir() {
 						// match file pattern
 						if matched, _ := filepath.Match(cfg.FilesPat, inf.Name()); matched {
@@ -48,11 +49,19 @@ func readDir(ctx context.Context, name string, cfg *FolderCfg) <-chan os.FileInf
 							loc := sort.Search(len(lastInfo), func(i int) bool {
 								return lastInfo[i].Name() >= inf.Name()
 							})
+							// new file not in list
 							if loc >= len(lastInfo) || (loc < len(lastInfo) && lastInfo[loc].Name() != inf.Name()) {
 								// send along the file
 								select {
 								case out <- inf:
 									wait = 0
+								case <-done:
+									return
+								}
+							} else if inf.ModTime().Before(time.Now().Add(-time.Minute)) {
+								// send along the file - handle very old files that for some reason are still there
+								select {
+								case out <- inf:
 								case <-done:
 									return
 								}
