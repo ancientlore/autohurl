@@ -51,7 +51,7 @@ func init() {
 
 	// processing
 	flag.DurationVar((*time.Duration)(&defaultCfg.SleepTime), "sleep", time.Duration(defaultCfg.SleepTime), "Interval to wait when no files are found.")
-	flag.IntVar(&defaultCfg.MaxFileSize, "maxsize", defaultCfg.MaxFileSize, "Maximum file size to post.")
+	flag.Int64Var(&defaultCfg.MaxFileSize, "maxsize", defaultCfg.MaxFileSize, "Maximum file size to post.")
 	flag.IntVar(&defaultCfg.BatchSize, "batchsize", defaultCfg.BatchSize, "Readdir batch size.")
 
 	// headers
@@ -195,8 +195,10 @@ func main() {
 		}
 		fmt.Printf("[folders.%s]\n%s\n", i, cfg[i].String())
 		kubismus.Note("folders."+i, cfg[i].String())
+		kubismus.Define(i+"_Errors", kubismus.COUNT, i+": Errors")
 		kubismus.Define(i+"_Sent", kubismus.COUNT, i+": HTTP Posts")
 		kubismus.Define(i+"_Sent", kubismus.SUM, i+": Bytes Sent")
+		kubismus.Define(i+"_Received", kubismus.SUM, i+": Bytes Received")
 		kubismus.Define(i+"_ResponseTime", kubismus.AVERAGE, i+": Average Time (s)")
 	}
 

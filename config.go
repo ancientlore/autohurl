@@ -40,7 +40,7 @@ type DefaultCfg struct {
 	FilesPat     string   `toml:"files"`       // Pattern of files to look for
 	Conns        int      `toml:"conns"`       // Number of concurrent HTTP connections
 	Method       string   `toml:"method"`      // HTTP method (POST or PUT or PATCH, generally)
-	MaxFileSize  int      `toml:"maxsize"`     // Maximum file size - larger files are moved or ignored
+	MaxFileSize  int64    `toml:"maxsize"`     // Maximum file size - larger files are moved or ignored
 	NoCompress   bool     `toml:"nocompress"`  // Disable HTTP compression
 	NoKeepAlive  bool     `toml:"nokeepalive"` // Disable HTTP keep-alive (not recommended)
 	UseRequestId string   `toml:"requestid"`   // Enable X-RequestID header

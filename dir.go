@@ -64,7 +64,7 @@ func readDir(ctx context.Context, name string, cfg *FolderCfg) <-chan os.FileInf
 				sort.Sort(FI(lastInfo))
 			}
 			if wait > 0 {
-				log.Print(name, ": Waiting ", wait.String())
+				// log.Print(name, ": Waiting ", wait.String())
 				c := time.After(wait)
 				select {
 				case <-done:
