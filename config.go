@@ -51,6 +51,17 @@ type DefaultCfg struct {
 	Headers      []hdr    `toml:"-"`           // Parsed headers
 }
 
+// Prints config in TOML
+func (c *DefaultCfg) String() string {
+	var b bytes.Buffer
+	enc := toml.NewEncoder(&b)
+	err := enc.Encode(c)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(b.Bytes())
+}
+
 // Init sets the default values for DefaultCfg
 func (c *DefaultCfg) Init() {
 	c.BatchSize = 32 * 1024

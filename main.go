@@ -166,6 +166,17 @@ func main() {
 		kubismus.Note("Working Directory", wd)
 	}
 
+	// Print settings
+	fmt.Printf("addr = \"%s\"\n", addr)
+	fmt.Printf("cpu = %d\n", cpus)
+	fmt.Printf("wd = \"%s\"\n", workingDir)
+	fmt.Printf("cpuprofile = \"%s\"\n", cpuProfile)
+	fmt.Printf("memprofile = \"%s\"\n", memProfile)
+	fmt.Println()
+
+	// Print default folder settings
+	fmt.Printf("[folders.*]\n%s\n", defaultCfg.String())
+
 	// read folders
 	var cfg map[string]*FolderCfg
 	cfg, err = readConfig(flagcfg.Filename())
