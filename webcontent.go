@@ -21,11 +21,10 @@ var staticFiles = map[string]string{
 	"/media/logo72.png": cMedia_Logo72Png,
 }
 
+// Lookup returns the bytes associated with the given path, or nil if the path was not found.
 func Lookup(path string) []byte {
 	s, ok := staticFiles[path]
-	if !ok {
-		return nil
-	} else {
+	if ok {
 		d, err := base64.URLEncoding.DecodeString(s)
 		if err != nil {
 			log.Print("main.Lookup: ", err)
@@ -38,8 +37,10 @@ func Lookup(path string) []byte {
 		}
 		return r
 	}
+	return nil
 }
 
+// ServeHTTP serves the stored file data over HTTP.
 func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p := r.URL.Path
 	if strings.HasSuffix(p, "/") {

@@ -1,3 +1,3 @@
 package main
 
-const AUTOHURL_VERSION = "0.2"
+const autohurlVersion = "0.3"

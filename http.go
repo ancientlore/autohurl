@@ -1,11 +1,9 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/ancientlore/kubismus"
-	"github.com/nu7hatch/gouuid"
-	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
 	"log"
@@ -15,9 +13,12 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/ancientlore/kubismus"
+	"github.com/nu7hatch/gouuid"
 )
 
-func doHttp(ctx context.Context, name string, cfg *FolderCfg, ch <-chan os.FileInfo) {
+func doHTTP(ctx context.Context, name string, cfg *FolderCfg, ch <-chan os.FileInfo) {
 	var wg sync.WaitGroup
 
 	// create HTTP transport and client
@@ -152,10 +153,10 @@ func postFile(name string, cfg *FolderCfg, inf os.FileInfo) error {
 	req.ContentLength = inf.Size()
 
 	// Set request ID header if desired
-	if cfg.UseRequestId != "" {
+	if cfg.UseRequestID != "" {
 		guid, err := uuid.NewV4()
 		if err == nil {
-			req.Header.Set(cfg.UseRequestId, guid.String())
+			req.Header.Set(cfg.UseRequestID, guid.String())
 		}
 	}
 

@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"errors"
-	"github.com/BurntSushi/toml"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
 // duration exists for TOML to handle durations
@@ -43,7 +44,7 @@ type DefaultCfg struct {
 	MaxFileSize  int64    `toml:"maxsize"`     // Maximum file size - larger files are moved or ignored
 	NoCompress   bool     `toml:"nocompress"`  // Disable HTTP compression
 	NoKeepAlive  bool     `toml:"nokeepalive"` // Disable HTTP keep-alive (not recommended)
-	UseRequestId string   `toml:"requestid"`   // Enable X-RequestID header
+	UseRequestID string   `toml:"requestid"`   // Enable X-RequestID header
 	BatchSize    int      `toml:"batchsize"`   // Readdir batch size
 	HeaderDelim  string   `toml:"hdrdelim"`    // Header delimiter
 	HeaderText   string   `toml:"headers"`     // Text of headers
@@ -129,8 +130,8 @@ func (c *FolderCfg) SetDefaults(from *DefaultCfg) {
 	if c.NoKeepAlive == false {
 		c.NoKeepAlive = from.NoKeepAlive
 	}
-	if c.UseRequestId == "" {
-		c.UseRequestId = from.UseRequestId
+	if c.UseRequestID == "" {
+		c.UseRequestID = from.UseRequestID
 	}
 	if c.BatchSize == 0 {
 		c.BatchSize = from.BatchSize
@@ -164,7 +165,7 @@ type hdr struct {
 
 // parseHeaders parses the header text with the given delimiter
 func parseHeaders(headerText, headerDelim string) ([]hdr, error) {
-	headers := make([]hdr, 0)
+	var headers []hdr
 	headerText = strings.TrimSpace(headerText)
 	if headerText != "" {
 		arr := strings.Split(headerText, headerDelim)

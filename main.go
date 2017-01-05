@@ -1,12 +1,9 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"github.com/ancientlore/flagcfg"
-	"github.com/ancientlore/kubismus"
-	"github.com/facebookgo/flagenv"
-	"golang.org/x/net/context"
 	"log"
 	"net/http"
 	"os"
@@ -14,13 +11,17 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"time"
+
+	"github.com/ancientlore/flagcfg"
+	"github.com/ancientlore/kubismus"
+	"github.com/facebookgo/flagenv"
 )
 
 // github.com/ancientlore/binder is used to package the web files into the executable.
 //go:generate binder -package main -o webcontent.go media/*.png
 
 var (
-	addr       string = ":8080"
+	addr       string
 	cpuProfile string
 	memProfile string
 	cpus       int
@@ -37,14 +38,14 @@ func init() {
 	defaultCfg.Init()
 
 	// http service/status address
-	flag.StringVar(&addr, "addr", addr, "HTTP service address for monitoring.")
+	flag.StringVar(&addr, "addr", ":8080", "HTTP service address for monitoring.")
 
 	// http post settings
 	flag.IntVar(&defaultCfg.Conns, "conns", defaultCfg.Conns, "Number of concurrent HTTP connections.")
 	flag.DurationVar((*time.Duration)(&defaultCfg.Timeout), "timeout", time.Duration(defaultCfg.Timeout), "HTTP timeout.")
 	flag.StringVar(&defaultCfg.FilesPat, "files", defaultCfg.FilesPat, "Pattern of files to post, like *.xml.")
 	flag.StringVar(&defaultCfg.Method, "method", defaultCfg.Method, "HTTP method.")
-	flag.StringVar(&defaultCfg.UseRequestId, "requestid", defaultCfg.UseRequestId, "Name of header to send a random GUID.")
+	flag.StringVar(&defaultCfg.UseRequestID, "requestid", defaultCfg.UseRequestID, "Name of header to send a random GUID.")
 	flag.BoolVar(&defaultCfg.NoCompress, "nocompress", defaultCfg.NoCompress, "Disable HTTP compression.")
 	flag.BoolVar(&defaultCfg.NoKeepAlive, "nokeepalive", defaultCfg.NoKeepAlive, "Disable HTTP keep-alives.")
 	flag.BoolVar(&defaultCfg.FileInfo, "fileinfo", defaultCfg.FileInfo, "Whether to send file information headers.")
@@ -98,7 +99,7 @@ of the file can be overridden with the AUTOHURL_CONFIG environment variable.`)
 }
 
 func showVersion() {
-	fmt.Printf("autohURL version %s\n", AUTOHURL_VERSION)
+	fmt.Printf("autohURL version %s\n", autohurlVersion)
 }
 
 func main() {
@@ -187,7 +188,7 @@ func main() {
 		log.Fatal("No folders configured to watch")
 	}
 	// set up default settings
-	for i, _ := range cfg {
+	for i := range cfg {
 		cfg[i].SetDefaults(&defaultCfg)
 		err = cfg[i].ParseHeaders()
 		if err != nil {
@@ -238,7 +239,7 @@ func main() {
 	// Build pipeline
 	for name, fldr := range cfg {
 		ch1 := readDir(ctx, name, fldr)
-		go doHttp(ctx, name, fldr, ch1)
+		go doHTTP(ctx, name, fldr, ch1)
 	}
 
 	// write memory profile if configured

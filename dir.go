@@ -1,7 +1,7 @@
 package main
 
 import (
-	"golang.org/x/net/context"
+	"context"
 	"io"
 	"log"
 	"os"
@@ -10,11 +10,11 @@ import (
 	"time"
 )
 
-type FI []os.FileInfo
+type fileInfoSlice []os.FileInfo
 
-func (fi FI) Len() int           { return len(fi) }
-func (fi FI) Swap(i, j int)      { fi[i], fi[j] = fi[j], fi[i] }
-func (fi FI) Less(i, j int) bool { return fi[i].Name() < fi[j].Name() }
+func (fi fileInfoSlice) Len() int           { return len(fi) }
+func (fi fileInfoSlice) Swap(i, j int)      { fi[i], fi[j] = fi[j], fi[i] }
+func (fi fileInfoSlice) Less(i, j int) bool { return fi[i].Name() < fi[j].Name() }
 
 func readDir(ctx context.Context, name string, cfg *FolderCfg) <-chan os.FileInfo {
 	done := ctx.Done()
@@ -23,7 +23,7 @@ func readDir(ctx context.Context, name string, cfg *FolderCfg) <-chan os.FileInf
 		defer close(out)
 		var lastInfo = make([]os.FileInfo, 0)
 		for {
-			var wait time.Duration = 0
+			var wait time.Duration
 			fil, err := os.Open(cfg.Folder)
 			if err != nil {
 				log.Print(name, ": Unable to open folder: ", cfg.Folder, " ", err)
@@ -70,7 +70,7 @@ func readDir(ctx context.Context, name string, cfg *FolderCfg) <-chan os.FileInf
 					}
 				}
 				lastInfo = info
-				sort.Sort(FI(lastInfo))
+				sort.Sort(fileInfoSlice(lastInfo))
 			}
 			if wait > 0 {
 				// log.Print(name, ": Waiting ", wait.String())
