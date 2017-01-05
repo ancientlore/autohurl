@@ -68,7 +68,7 @@ func processFile(name string, cfg *FolderCfg, inf os.FileInfo) {
 		return
 	}
 
-	// Give very new files a change to finish up. Sort of hacky.
+	// Give very new files a chance to finish up. Sort of hacky.
 	if inf.ModTime().After(time.Now().Add(-time.Second)) {
 		time.Sleep(time.Second)
 	}
@@ -77,7 +77,7 @@ func processFile(name string, cfg *FolderCfg, inf os.FileInfo) {
 
 	// skip large file, possibly moving it
 	if cfg.MaxFileSize > 0 && inf.Size() > cfg.MaxFileSize {
-		log.Print(name, ":  ", inf.Size(), " byte file, skip/rename: ", fname)
+		//log.Print(name, ":  ", inf.Size(), " byte file, skip/rename: ", fname)
 		if cfg.MoveFailedTo != "" {
 			_, fn := filepath.Split(inf.Name())
 			newFname := filepath.Join(cfg.MoveFailedTo, fn)
