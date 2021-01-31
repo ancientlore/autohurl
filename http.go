@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/ancientlore/kubismus"
-	"github.com/nu7hatch/gouuid"
+	"github.com/google/uuid"
 )
 
 func doHTTP(ctx context.Context, name string, cfg *FolderCfg, ch <-chan os.FileInfo) {
@@ -154,7 +154,7 @@ func postFile(name string, cfg *FolderCfg, inf os.FileInfo) error {
 
 	// Set request ID header if desired
 	if cfg.UseRequestID != "" {
-		guid, err := uuid.NewV4()
+		guid, err := uuid.NewRandom()
 		if err == nil {
 			req.Header.Set(cfg.UseRequestID, guid.String())
 		}
