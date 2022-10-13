@@ -1,7 +1,7 @@
 module github.com/ancientlore/autohurl
 
 require (
-	github.com/BurntSushi/toml v0.4.1
+	github.com/BurntSushi/toml v1.2.0
 	github.com/ancientlore/flagcfg v1.0.4
 	github.com/ancientlore/kubismus v1.1.2
 	github.com/davecgh/go-spew v1.1.1 // indirect
