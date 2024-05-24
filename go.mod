@@ -1,8 +1,8 @@
 module github.com/ancientlore/autohurl
 
 require (
-	github.com/BurntSushi/toml v1.3.2
-	github.com/ancientlore/flagcfg v1.1.0
+	github.com/BurntSushi/toml v1.4.0
+	github.com/ancientlore/flagcfg v1.2.0
 	github.com/ancientlore/kubismus v1.1.3
 	github.com/facebookgo/flagenv v0.0.0-20160425205200-fcd59fca7456
 	github.com/google/uuid v1.6.0
